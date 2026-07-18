@@ -1,112 +1,34 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-
-// --- Types ---
-type Alert = {
-  offset: number;
-  length: number;
-  message: string;
-  shortMessage: string;
-  category: string;
-  replacements: string[];
-};
+import { useState, useEffect } from "react";
+import { useGrammarChecker } from "@/hooks/useGrammarChecker";
 
 type ActiveTab = "grammar" | "paraphraser" | "ai-detection" | "humanizer";
 
 export default function Home() {
-  const [text, setText] = useState("");
-  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
-  const [scrolled, setScrolled] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const grammarDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const grammarRequestInFlightRef = useRef(false);
-  const pendingGrammarTextRef = useRef<string>("");
-  const pendingGrammarCheckRef = useRef(false);
-
-  // Editor state
   const [activeTab, setActiveTab] = useState<ActiveTab>("grammar");
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [rephrasedText, setRephrasedText] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [score, setScore] = useState<string | null>(null);
-  const [expandedAlert, setExpandedAlert] = useState<number | null>(null);
-  const hardAlerts = alerts.filter((alert) => alert.category !== "Style");
-  const styleAlerts = alerts.filter((alert) => alert.category === "Style");
-  const autoFixableAlerts = hardAlerts.filter((alert) => alert.replacements && alert.replacements.length > 0);
+  const [scrolled, setScrolled] = useState(false);
 
-  const showToast = useCallback((message: string) => {
-    if (toastTimeoutRef.current) {
-      clearTimeout(toastTimeoutRef.current);
-    }
-
-    setToastMessage(message);
-    toastTimeoutRef.current = setTimeout(() => {
-      setToastMessage(null);
-    }, 2200);
-  }, []);
-
-  async function executeGrammarCheck(sourceText: string) {
-    if (!sourceText.trim()) {
-      setAlerts([]);
-      setScore(null);
-      setError(null);
-      return;
-    }
-
-    if (grammarRequestInFlightRef.current) {
-      pendingGrammarTextRef.current = sourceText;
-      pendingGrammarCheckRef.current = true;
-      return;
-    }
-
-    grammarRequestInFlightRef.current = true;
-    setIsLoading(true);
-    setError(null);
-    setAlerts([]);
-
-    try {
-      const res = await fetch("/api/grammar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: sourceText }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 429 || data.error?.includes("429")) {
-          alert("Rate limit reached (429 Too Many Requests). Please wait 60 seconds before trying again.");
-          throw new Error("Rate limit exceeded. Please wait 60 seconds.");
-        }
-        throw new Error(data.error || "Grammar check failed");
-      }
-
-      setAlerts(data.alerts || []);
-      const nonStyleCount = (data.alerts || []).filter((alert: Alert) => alert.category !== "Style").length;
-      setScore(nonStyleCount === 0 ? "Perfect Score" : `${nonStyleCount} issue(s)`);
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : "Something went wrong";
-      setError(errMsg);
-      setScore("Error");
-    } finally {
-      grammarRequestInFlightRef.current = false;
-      setIsLoading(false);
-
-      if (pendingGrammarCheckRef.current && pendingGrammarTextRef.current.trim()) {
-        const queuedText = pendingGrammarTextRef.current;
-        pendingGrammarCheckRef.current = false;
-        pendingGrammarTextRef.current = "";
-        void executeGrammarCheck(queuedText);
-      }
-    }
-  }
-
-  const handleCheckGrammar = () => {
-    void executeGrammarCheck(text);
-  };
+  const {
+    text,
+    setText,
+    alerts,
+    isLoading,
+    setIsLoading,
+    error,
+    score,
+    expandedAlert,
+    setExpandedAlert,
+    wordCount,
+    hardAlerts,
+    styleAlerts,
+    autoFixableAlerts,
+    checkGrammar,
+    reset,
+    showToast,
+    toastMessage,
+  } = useGrammarChecker({ enabled: activeTab === "grammar" });
 
   const handleRephrase = async () => {
     if (!text.trim() || isLoading) return;
@@ -141,7 +63,7 @@ export default function Home() {
   };
 
   const handleTabAction = () => {
-    if (activeTab === "grammar") handleCheckGrammar();
+    if (activeTab === "grammar") checkGrammar();
     else if (activeTab === "paraphraser") handleRephrase();
     else setError("This feature is coming soon!");
   };
@@ -153,47 +75,6 @@ export default function Home() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimeoutRef.current) {
-        clearTimeout(toastTimeoutRef.current);
-      }
-      if (grammarDebounceRef.current) {
-        clearTimeout(grammarDebounceRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== "grammar") {
-      if (grammarDebounceRef.current) {
-        clearTimeout(grammarDebounceRef.current);
-      }
-      return;
-    }
-
-    if (!text.trim()) {
-      if (grammarDebounceRef.current) {
-        clearTimeout(grammarDebounceRef.current);
-      }
-      return;
-    }
-
-    if (grammarDebounceRef.current) {
-      clearTimeout(grammarDebounceRef.current);
-    }
-
-    grammarDebounceRef.current = setTimeout(() => {
-      void executeGrammarCheck(text);
-    }, 1000);
-
-    return () => {
-      if (grammarDebounceRef.current) {
-        clearTimeout(grammarDebounceRef.current);
-      }
-    };
-  }, [text, activeTab]);
 
   return (
     <>
@@ -321,19 +202,19 @@ export default function Home() {
 
                 {/* Top Toolbar Outside Editor */}
                 <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-2 sm:gap-3 mb-4 sm:mb-5 relative z-10 w-full" data-aos="fade-up" data-aos-delay="150">
-                  <button onClick={() => { setActiveTab("grammar"); setAlerts([]); setScore(null); setError(null); }} className={`shrink-0 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] flex items-center gap-2 border transition-colors ${activeTab === "grammar" ? "bg-surface-container-lowest shadow-sm text-primary font-bold border-surface-variant" : "bg-surface-container-lowest/40 backdrop-blur hover:bg-surface-container-lowest text-secondary font-medium border-transparent hover:border-surface-variant"}`}>
+                  <button onClick={() => { setActiveTab("grammar"); reset(); }} className={`shrink-0 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] flex items-center gap-2 border transition-colors ${activeTab === "grammar" ? "bg-surface-container-lowest shadow-sm text-primary font-bold border-surface-variant" : "bg-surface-container-lowest/40 backdrop-blur hover:bg-surface-container-lowest text-secondary font-medium border-transparent hover:border-surface-variant"}`}>
                     <span className="material-symbols-outlined text-[20px]">spellcheck</span>
                     Grammar
                   </button>
-                  <button onClick={() => { setActiveTab("paraphraser"); setRephrasedText([]); setScore(null); setError(null); }} className={`shrink-0 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] flex items-center gap-2 border transition-colors ${activeTab === "paraphraser" ? "bg-surface-container-lowest shadow-sm text-primary font-bold border-surface-variant" : "bg-surface-container-lowest/40 backdrop-blur hover:bg-surface-container-lowest text-secondary font-medium border-transparent hover:border-surface-variant"}`}>
+                  <button onClick={() => { setActiveTab("paraphraser"); setRephrasedText([]); reset(); }} className={`shrink-0 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] flex items-center gap-2 border transition-colors ${activeTab === "paraphraser" ? "bg-surface-container-lowest shadow-sm text-primary font-bold border-surface-variant" : "bg-surface-container-lowest/40 backdrop-blur hover:bg-surface-container-lowest text-secondary font-medium border-transparent hover:border-surface-variant"}`}>
                     <span className="material-symbols-outlined text-[20px]">swap_horiz</span>
                     Paraphraser
                   </button>
-                  <button onClick={() => { setActiveTab("ai-detection"); setError(null); }} className={`shrink-0 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] flex items-center gap-2 border transition-colors ${activeTab === "ai-detection" ? "bg-surface-container-lowest shadow-sm text-primary font-bold border-surface-variant" : "bg-surface-container-lowest/40 backdrop-blur hover:bg-surface-container-lowest text-secondary font-medium border-transparent hover:border-surface-variant"}`}>
+                  <button onClick={() => { setActiveTab("ai-detection"); reset(); }} className={`shrink-0 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] flex items-center gap-2 border transition-colors ${activeTab === "ai-detection" ? "bg-surface-container-lowest shadow-sm text-primary font-bold border-surface-variant" : "bg-surface-container-lowest/40 backdrop-blur hover:bg-surface-container-lowest text-secondary font-medium border-transparent hover:border-surface-variant"}`}>
                     <span className="material-symbols-outlined text-[20px]">find_in_page</span>
                     AI Detection
                   </button>
-                  <button onClick={() => { setActiveTab("humanizer"); setError(null); }} className={`shrink-0 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] flex items-center gap-2 border transition-colors ${activeTab === "humanizer" ? "bg-surface-container-lowest shadow-sm text-primary font-bold border-surface-variant" : "bg-surface-container-lowest/40 backdrop-blur hover:bg-surface-container-lowest text-secondary font-medium border-transparent hover:border-surface-variant"}`}>
+                  <button onClick={() => { setActiveTab("humanizer"); reset(); }} className={`shrink-0 px-3 py-2 sm:px-5 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] flex items-center gap-2 border transition-colors ${activeTab === "humanizer" ? "bg-surface-container-lowest shadow-sm text-primary font-bold border-surface-variant" : "bg-surface-container-lowest/40 backdrop-blur hover:bg-surface-container-lowest text-secondary font-medium border-transparent hover:border-surface-variant"}`}>
                     <span className="material-symbols-outlined text-[20px]">psychology</span>
                     Humanizer
                   </button>
@@ -346,19 +227,7 @@ export default function Home() {
                       <textarea
                         value={text}
                         onChange={(e) => {
-                          const nextText = e.target.value;
-                          setText(nextText);
-
-                          if (!nextText.trim()) {
-                            if (grammarDebounceRef.current) {
-                              clearTimeout(grammarDebounceRef.current);
-                            }
-                            pendingGrammarCheckRef.current = false;
-                            pendingGrammarTextRef.current = "";
-                            setAlerts([]);
-                            setScore(null);
-                            setError(null);
-                          }
+                          setText(e.target.value);
                         }}
                         className="w-full flex-1 resize-none outline-none border-none focus:outline-none focus:ring-0 text-body-lg text-on-surface bg-transparent font-body-lg leading-relaxed placeholder:opacity-30"
                         placeholder="Start typing or paste your text here to see the magic..."
