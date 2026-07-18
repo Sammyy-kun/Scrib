@@ -10,10 +10,13 @@ export interface UseGrammarCheckerReturn {
   text: string;
   setText: (text: string) => void;
   alerts: Alert[];
+  setAlerts: (alerts: Alert[] | ((prev: Alert[]) => Alert[])) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   error: string | null;
+  setError: (error: string | null | ((prev: string | null) => string | null)) => void;
   score: string | null;
+  setScore: (score: string | null | ((prev: string | null) => string | null)) => void;
   expandedAlert: number | null;
   setExpandedAlert: (index: number | null) => void;
   wordCount: number;
@@ -177,10 +180,13 @@ export function useGrammarChecker(
     text,
     setText,
     alerts,
+    setAlerts,
     isLoading,
     setIsLoading,
     error,
+    setError,
     score,
+    setScore,
     expandedAlert,
     setExpandedAlert,
     wordCount,
