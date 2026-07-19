@@ -13,25 +13,17 @@ export default function Home() {
   const {
     text,
     setText,
-    alerts,
-    setAlerts,
+    correctedText,
     isLoading,
     setIsLoading,
     error,
     setError,
-    score,
-    setScore,
-    expandedAlert,
-    setExpandedAlert,
     wordCount,
-    hardAlerts,
-    styleAlerts,
-    autoFixableAlerts,
     checkGrammar,
     reset,
     showToast,
     toastMessage,
-  } = useGrammarChecker({ enabled: activeTab === "grammar" });
+  } = useGrammarChecker();
 
   const handleRephrase = async () => {
     if (!text.trim() || isLoading) return;
@@ -260,68 +252,41 @@ export default function Home() {
                           Copy
                         </button>
                         <span className="font-label-md text-[12px] text-primary-container font-bold whitespace-nowrap shrink-0 ml-auto sm:ml-0">
-                          {score ?? "Ready"}
+                          {correctedText ? "Corrected" : "Ready"}
                         </span>
                       </div>
-                      {autoFixableAlerts.length > 0 && activeTab === "grammar" ? (
-                        <button
-                          onClick={() => {
-                            let fixed = text;
-                            const sorted = [...autoFixableAlerts]
-                              .sort((a, b) => b.offset - a.offset);
-                            sorted.forEach(a => {
-                              fixed = fixed.slice(0, a.offset) + a.replacements[0] + fixed.slice(a.offset + a.length);
-                            });
-                            setText(fixed);
-                            setAlerts([]);
-                            setScore("Perfect Score");
-                            setExpandedAlert(null);
-                            showToast("Grammar fixed");
-                          }}
-                          className="col-span-2 sm:col-span-1 shrink-0 w-full sm:w-auto bg-primary-container text-on-primary rounded-lg font-button text-button px-8 py-3 hover:bg-primary transition-all shadow-lg hover:shadow-primary-container/20 active:scale-95 whitespace-nowrap sm:ml-4 flex items-center justify-center gap-2"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">auto_fix_high</span>
-                          Fix All
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleTabAction}
-                          disabled={isLoading || !text.trim()}
-                          className="col-span-2 sm:col-span-1 shrink-0 w-full sm:w-auto bg-primary-container text-on-primary rounded-lg font-button text-button px-8 py-3 hover:bg-primary transition-all shadow-lg hover:shadow-primary-container/20 active:scale-95 whitespace-nowrap sm:ml-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {isLoading && <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>}
-                          {activeTab === "grammar" && (isLoading ? "Checking..." : "Check Grammar")}
-                          {activeTab === "paraphraser" && (isLoading ? "Rephrasing..." : "Rephrase Text")}
-                          {(activeTab === "ai-detection" || activeTab === "humanizer") && "Coming Soon"}
-                        </button>
-                      )}
+                      <button
+                        onClick={handleTabAction}
+                        disabled={isLoading || !text.trim()}
+                        className="col-span-2 sm:col-span-1 shrink-0 w-full sm:w-auto bg-primary-container text-on-primary rounded-lg font-button text-button px-8 py-3 hover:bg-primary transition-all shadow-lg hover:shadow-primary-container/20 active:scale-95 whitespace-nowrap sm:ml-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isLoading && <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>}
+                        {activeTab === "grammar" && (isLoading ? "Correcting..." : "Check Grammar")}
+                        {activeTab === "paraphraser" && (isLoading ? "Rephrasing..." : "Rephrase Text")}
+                        {(activeTab === "ai-detection" || activeTab === "humanizer") && "Coming Soon"}
+                      </button>
                     </div>
                   </div>
                   <div className="w-full lg:w-[540px] bg-surface-container-lowest border-t lg:border-t-0 lg:border-l border-surface-variant flex flex-col min-h-0">
                     <div className="p-5 border-b border-surface-variant bg-transparent flex items-start justify-between gap-3 min-w-0">
                       <div className="min-w-0">
                         <h4 className="font-label-md text-[11px] sm:text-label-md text-on-surface font-bold min-w-0 truncate">
-                          {activeTab === "grammar" ? "Live Suggestions" : activeTab === "paraphraser" ? "Rephrased Versions" : "Results"}
+                          {activeTab === "grammar" ? "Grammar Check" : activeTab === "paraphraser" ? "Rephrased Versions" : "Results"}
                         </h4>
                         <p className="mt-1 text-[11px] text-secondary leading-tight max-w-[220px] sm:max-w-none">
                           {activeTab === "grammar"
-                            ? styleAlerts.length > 0
-                              ? "Style suggestions are shown, but only hard errors are auto-applied."
-                              : "Review and apply fixes one by one."
+                            ? correctedText
+                              ? "Your text has been corrected."
+                              : "Click Check Grammar to correct your text."
                             : activeTab === "paraphraser"
                               ? "Pick the version you want to use."
                               : "Status and output will appear here."}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 ml-auto shrink-0">
-                        {activeTab === "grammar" && hardAlerts.length > 0 && (
+                        {activeTab === "grammar" && correctedText && (
                           <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary-container/10 text-primary-container whitespace-nowrap">
-                            {hardAlerts.length} issue{hardAlerts.length !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                        {activeTab === "grammar" && hardAlerts.length === 0 && styleAlerts.length > 0 && (
-                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-surface-variant text-secondary whitespace-nowrap">
-                            {styleAlerts.length} style suggestion{styleAlerts.length !== 1 ? "s" : ""}
+                            Corrected
                           </span>
                         )}
                         {rephrasedText.length > 0 && activeTab === "paraphraser" && (
@@ -344,104 +309,26 @@ export default function Home() {
                           {error}
                         </div>
                       )}
-                      {!isLoading && !error && activeTab === "grammar" && alerts.length === 0 && (
+                      {!isLoading && !error && activeTab === "grammar" && correctedText && (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
+                          <div className="w-16 h-16 rounded-full bg-primary-container/5 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary-container text-[32px] opacity-40">check_circle</span>
+                          </div>
+                          <p className="font-body-sm text-secondary px-4 leading-relaxed">
+                            ✅ Text corrected! Your text has been updated in the editor.
+                          </p>
+                        </div>
+                      )}
+                      {!isLoading && !error && activeTab === "grammar" && !correctedText && (
                         <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
                           <div className="w-16 h-16 rounded-full bg-primary-container/5 flex items-center justify-center">
                             <span className="material-symbols-outlined text-primary-container text-[32px] opacity-40">edit_note</span>
                           </div>
                           <p className="font-body-sm text-secondary px-4 leading-relaxed">
-                            {score === "Perfect Score" ? "✅ No issues found! Your text looks great." : "Paste text and click Check Grammar to start."}
+                            Paste text and click Check Grammar to start.
                           </p>
                         </div>
                       )}
-                      {!isLoading && activeTab === "grammar" && alerts.filter(a => a && a.category).map((alert, i) => {
-                        const isExpanded = expandedAlert === i;
-                        const categoryColor: Record<string, string> = {
-                          Grammar: "text-primary-container bg-primary-container/10",
-                          Spelling: "text-error bg-error/10",
-                          Punctuation: "text-tertiary-container bg-tertiary-fixed-dim/20",
-                          Style: "text-secondary bg-surface-variant",
-                        };
-                        const colorClass = categoryColor[alert.category] || "text-secondary bg-surface-variant";
-                        return (
-                          <div key={i} className={`border rounded-2xl transition-all overflow-hidden ${isExpanded ? "bg-white border-primary-container/30 shadow-md" : "bg-white border-surface-variant shadow-sm hover:border-primary-container/20"}`}>
-                            {/* Compact header — always visible */}
-                            <button
-                              onClick={() => setExpandedAlert(isExpanded ? null : i)}
-                              className="w-full flex flex-col items-stretch gap-2 px-4 py-3.5 text-left min-h-[48px] min-w-0"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full ${colorClass}`}>
-                                  {alert.category}
-                                </span>
-                                <span className="shrink-0 text-[11px] text-secondary font-medium tabular-nums">
-                                  {typeof alert.length === "number" ? `${alert.length} char${alert.length !== 1 ? "s" : ""}` : ""}
-                                </span>
-                                {alert?.replacements?.[0] && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const before = text.slice(0, alert.offset);
-                                      const after = text.slice(alert.offset + alert.length);
-                                      setText(before + alert.replacements[0] + after);
-                                      setAlerts(prev => prev.filter((_, idx) => idx !== i));
-                                      setExpandedAlert(null);
-                                      showToast("Grammar fixed");
-                                    }}
-                                    className="ml-auto shrink-0 text-xs px-3 py-1.5 bg-primary-container text-on-primary rounded-full font-medium hover:bg-primary transition-colors max-w-[140px] truncate"
-                                    title={alert.replacements[0]}
-                                  >
-                                    {alert.replacements[0]}
-                                  </button>
-                                )}
-                                <span className={`material-symbols-outlined text-[16px] text-secondary transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}>
-                                  expand_more
-                                </span>
-                              </div>
-                              <span className="block min-w-0 text-sm text-on-surface font-medium whitespace-normal leading-relaxed">
-                                {alert.shortMessage || alert.message || "Unknown issue"}
-                              </span>
-                            </button>
-                            {/* Expanded detail */}
-                            {isExpanded && (
-                              <div className="px-4 pb-4 border-t border-surface-variant pt-3 bg-surface-container-lowest/70">
-                                <p className="text-xs text-secondary leading-relaxed mb-3">{alert.message}</p>
-                                {alert?.replacements?.length > 1 && (
-                                  <div className="flex flex-wrap gap-2">
-                                    <span className="text-xs text-secondary self-center">More fixes:</span>
-                                    {alert.replacements.slice(1, 4).map((r, j) => (
-                                      <button
-                                        key={j}
-                                        onClick={() => {
-                                          const before = text.slice(0, alert.offset);
-                                          const after = text.slice(alert.offset + alert.length);
-                                          setText(before + r + after);
-                                          setAlerts(prev => prev.filter((_, idx) => idx !== i));
-                                          setExpandedAlert(null);
-                                          showToast("Grammar fixed");
-                                        }}
-                                        className="text-xs px-3 py-1 bg-surface-variant text-on-surface rounded-full font-medium hover:bg-primary-container hover:text-on-primary transition-colors"
-                                      >
-                                        {r}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                                <button
-                                  onClick={() => {
-                                    setAlerts(prev => prev.filter((_, idx) => idx !== i));
-                                    setExpandedAlert(null);
-                                  }}
-                                  className="mt-3 text-xs text-secondary hover:text-error transition-colors flex items-center gap-1"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">close</span>
-                                  Dismiss
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
                       {!isLoading && activeTab === "paraphraser" && rephrasedText.length === 0 && (
                         <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
                           <div className="w-16 h-16 rounded-full bg-tertiary-fixed-dim/20 flex items-center justify-center">
