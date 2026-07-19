@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
           content: text,
         },
       ],
-      model: "llama-3.3-70b-versatile",
+      model: "llama-3.1-8b-instant",
       temperature: 0.1,
     });
 
@@ -44,16 +44,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ correctedText });
   } catch (error: unknown) {
     console.error("Groq API Error:", error);
+    const message = error instanceof Error ? error.message : "Failed to process text";
 
-    if (error instanceof Error && error.message.includes("429")) {
+    if (message.includes("429")) {
       return NextResponse.json(
-        { error: "Rate limit reached (429 Too Many Requests). Please wait 60 seconds before trying again." },
+        { error: "Rate limit reached (429 Too Many Requests). Please wait 60 seconds before trying again.", detail: message },
         { status: 429 }
       );
     }
 
     return NextResponse.json(
-      { error: "Failed to process text" },
+      { error: message },
       { status: 500 }
     );
   }
