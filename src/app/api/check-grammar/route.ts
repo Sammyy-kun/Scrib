@@ -1,7 +1,5 @@
-import Groq from "groq-sdk";
+import { Groq } from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
-
-const groq = new Groq();
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,6 +19,8 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    const groq = new Groq({ apiKey });
 
     const chatCompletion = await groq.chat.completions.create({
       messages: [
